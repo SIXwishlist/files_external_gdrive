@@ -60,25 +60,28 @@ class Google extends Flysystem {
 			&& isset($params['client_id']) && isset($params['client_secret'])
 			&& isset($params['token'])
 		) {
+			$token = json_decode($params['token'], true);
+			$this->id = 'google::'.substr($params['client_id'], 0, 30).$token['created'];
+
 			$config = [
+				'client_id' => $params['client_id'],
+				'client_secret' => $params['client_secret'],
 				'retry' => [
 					'retries' => 5
 				]
 			];
 			$this->client = new \Google_Client($config);
-			$this->client->setClientId($params['client_id']);
-			$this->client->setClientSecret($params['client_secret']);
-			$this->client->setScopes(['https://www.googleapis.com/auth/drive']);
-			$this->client->setAccessToken($params['token']);
+			$this->client->addScope(\Google_Service_Drive::DRIVE);
+			$this->client->setAccessToken($token['access_token']);
+
 			// note: API connection is lazy
 			$this->service = new \Google_Service_Drive($this->client);
-			$token = json_decode($params['token'], true);
-			$this->id = 'google::'.substr($params['client_id'], 0, 30).$token['created'];
-		} elseif (isset($params['configured']) && $params['configured'] === 'false') {
-			throw new \Exception('Google storage not yet configured');
+			$this->adapter = new \Hypweb\Flysystem\GoogleDrive\GoogleDriveAdapter($this->service);
+			$this->buildFlySystem($this->adapter);
+		} elseif (isset($params['client_id']) && isset($params['configured']) && $params['configured'] === 'false') {
+			throw new \Exception('Google storage '.$params['client_id'].' not yet configured');
 		} else {
-			//throw new \Exception('Creating Google storage failed');
-			throw new \Exception('Creating Google storage failed: '.json_encode($params));
+			throw new \Exception('Creating Google storage failed');
 		}
 	}
 
@@ -609,8 +612,10 @@ class Google extends Flysystem {
 	}
 
 	public function free_space($path) {
-		$about = $this->service->about->get();
-		return $about->getQuotaBytesTotal() - $about->getQuotaBytesUsed();
+		$about = $this->service->about->get(['fields' => '*']);
+		$storageQuota = $about->getStorageQuota();
+
+		return $storageQuota->getLimit() - $storageQuota->getUsage();
 	}
 
 	public function touch($path, $mtime = null) {

@@ -80,7 +80,7 @@ class OauthController extends Controller {
 			$client->setClientId((string)$clientId);
 			$client->setClientSecret((string)$clientSecret);
 			$client->setRedirectUri((string)$redirect);
-			$client->setScopes(['https://www.googleapis.com/auth/drive']);
+			$client->addScope(\Google_Service_Drive::DRIVE);
 			$client->setApprovalPrompt('force');
 			$client->setAccessType('offline');
 			if ($step !== null) {
@@ -111,7 +111,7 @@ class OauthController extends Controller {
 							[
 								'status' => 'success',
 								'data' => [
-									'token' => (string)$token
+									'token' => json_encode($token)
 								]
 							]
 						);
